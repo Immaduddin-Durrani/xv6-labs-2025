@@ -179,6 +179,11 @@ UPROGS=\
 	$U/_cat\
 	$U/_echo\
 	$U/_forktest\
+	$U/_sleep\
+        $U/_sixfive\
+        $U/_memdump\
+        $U/_find\
+	$U/_time\
 	$U/_grep\
 	$U/_init\
 	$U/_kill\
