@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
 
 struct cpu cpus[NCPU];
 
@@ -55,6 +56,9 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      // initialize sandbox/interpose defaults
+      p->deny_mask = 0;
+      p->allow_path[0] = '\0';   // empty string means "no allowed path"
   }
 }
 
@@ -124,6 +128,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  
+  p->deny_mask = 0;
+  p->allow_path[0] = '\0';
+
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -168,6 +176,9 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+
+  p->deny_mask = 0;
+  p->allow_path[0] = '\0';
   p->state = UNUSED;
 }
 
@@ -286,6 +297,11 @@ kfork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  
+  /* inherit sandbox/interpose settings from parent */
+  np->deny_mask = p->deny_mask;
+  safestrcpy(np->allow_path, p->allow_path, sizeof(np->allow_path));
+
 
   pid = np->pid;
 
