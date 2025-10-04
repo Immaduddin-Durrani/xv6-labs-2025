@@ -1,0 +1,23 @@
+Looking at the backtrace output, which function called syscall? 
+
+usertrap at kernel/usertrap.c
+
+What is the value of p->trapframe->a7 and what does that value represent? (Hint: look at user/init.c, the first user program xv6 starts, and its compiled assembly user/init.asm.) 
+
+The value of p->trapframe->a7 is 7. It represents the exec system call — the very first system call made by the init process.
+
+What was the previous mode that the CPU was in?
+
+Bit 8 was 0 so the CPU was in user mode before the system call trap if it was 1 it would have been in supervisor mode.
+
+Write down the assembly instruction the kernel is panicing at. Which register corresponds to the variable num? 
+
+Faulting instruction was lw a3,0(zero) at 0x80001cf8 and register for num is a3.
+
+Why does the kernel crash? Hint: look at figure 3-3 in the text; is address 0 mapped in the kernel address space? Is that confirmed by the value in scause above? (See description of scause in RISC-V privileged instructions) 
+
+The instruction lw a3,0(zero) means load a word from address 0 into register a3. But in RISC-V, virtual address 0 is not mapped in either user or kernel space. Since the kernel tried to read an unmapped address, the hardware raised a page fault exception. That matches what scause=0xd told us as scause=0xd means Load access fault and stval=0x0 means The faulting address was 0x0 so the kernel panics because it dereferenced a null pointer.
+
+What is the name of the process that was running when the kernel paniced? What is its process id (pid)? 
+
+The name of the process is init and it has pid of 1.
