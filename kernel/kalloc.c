@@ -8,8 +8,13 @@
 #include "spinlock.h"
 #include "riscv.h"
 #include "defs.h"
+#include "memlayout.h"
 
-void freerange(void *pa_start, void *pa_end);
+static void *super_free_list[N_SUPERPAGES];
+static int super_free_cnt = 0;
+
+
+void freerange(void *vstart, void *vend);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
@@ -31,13 +36,22 @@ kinit()
 }
 
 void
-freerange(void *pa_start, void *pa_end)
+freerange(void *vstart, void *vend)
 {
-  char *p;
-  p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  char *p = (char*)PGROUNDUP((uint64)vstart);
+  for (; (uint64)p + PGSIZE <= (uint64)vend; ) {
+    if (super_free_cnt < N_SUPERPAGES &&
+        ((uint64)p & (SUPERPAGE_SIZE - 1)) == 0 &&
+        (uint64)p + SUPERPAGE_SIZE <= (uint64)vend) {
+      super_free_list[super_free_cnt++] = p;
+      p = (char*)((uint64)p + SUPERPAGE_SIZE);
+      continue;
+    }
     kfree(p);
+    p += PGSIZE;
+  }
 }
+
 
 // Free the page of physical memory pointed at by pa,
 // which normally should have been returned by a
@@ -80,3 +94,22 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+// allocate one reserved 2MB region (returns kernel VA of that block)
+void *
+superalloc(void)
+{
+  if (super_free_cnt == 0)
+    return 0;
+  return super_free_list[--super_free_cnt];
+}
+
+// give back a reserved 2MB region (expects kernel VA)
+void
+superfree(void *pa)
+{
+  if (super_free_cnt >= N_SUPERPAGES)
+    panic("superfree: overflow");
+  super_free_list[super_free_cnt++] = pa;
+}
+

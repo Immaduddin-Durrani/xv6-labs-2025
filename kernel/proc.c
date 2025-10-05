@@ -131,6 +131,15 @@ found:
     release(&p->lock);
     return 0;
   }
+  // Allocate a page to hold the usyscall struct for fast user reads.
+  if ((p->usyscall = (struct usyscall*)kalloc()) == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+  memset((char*)p->usyscall, 0, PGSIZE);
+  p->usyscall->pid = p->pid;
+
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -158,6 +167,10 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  if(p->usyscall)
+    kfree((void*)p->usyscall);
+  p->usyscall = 0;
+
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -201,6 +214,15 @@ proc_pagetable(struct proc *p)
     uvmfree(pagetable, 0);
     return 0;
   }
+  
+  // map the per-process USYSCALL page (read-only to user)
+  if(mappages(pagetable, USYSCALL, PGSIZE, (uint64)(p->usyscall), PTE_R | PTE_U) < 0){
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
 
   return pagetable;
 }
@@ -212,6 +234,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -272,6 +295,27 @@ kfork(void)
     return -1;
   }
   np->sz = p->sz;
+  // Share the same trampoline and kernel mappings
+  np->trapframe->epc = p->trapframe->epc;
+  np->trapframe->sp = p->trapframe->sp;
+
+  
+  // ensure child's usyscall page contains child's pid (not parent's)
+  if (np->usyscall)
+    np->usyscall->pid = np->pid;
+
+  // If a mapping already exists at USYSCALL in np->pagetable, unmap it
+  // so we can (re)establish a correct mapping pointing at np->usyscall.
+  uvmunmap(np->pagetable, USYSCALL, 1, 0);
+
+  // map USYSCALL in child to child's usyscall kernel page (read-only)
+  if (mappages(np->pagetable, USYSCALL, PGSIZE, (uint64)(np->usyscall), PTE_R | PTE_U) < 0) {
+    // on error, cleanup like uvmcopy failure path
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
