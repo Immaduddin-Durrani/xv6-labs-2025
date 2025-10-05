@@ -1,0 +1,13 @@
+Answers for Page Tables Lab
+
+1. For every page table entry in the print_pgtbl output, explain what it logically contains and what its permission bits are:
+
+Each print_pgtbl line shows how a virtual address (va) maps to a physical address (pa) along with permission bits. For example, va 0x0 pte 0x21FC885B pa 0x87F22000 perm 0x5B means virtual address 0x0 maps to physical 0x87F22000 with permissions 0x5B (PTE_V | PTE_R | PTE_W | PTE_X | PTE_U), indicating it's valid, readable, writable, executable, and user-accessible. The first few entries represent user code, data, and stack pages, while unmapped entries (pte 0x0) indicate unused virtual memory. Near the top, va 0x3FFFFFE000 maps to the trapframe with permissions 0xC7 for saving registers, and va 0x3FFFFFF000 maps to the USYSCALL page with permissions 0x4B for fast system calls. Overall, these PTEs define the user process layout with proper protection bits.
+
+2. Which other xv6 system call(s) could be made faster using this shared page? Explain how:
+
+The USYSCALL shared page mechanism could also speed up system calls like getuid(), getgid(), and getppid() since they return user IDs, group IDs, and parent process IDs that don't change frequently during process execution. System calls like times() that return process accounting information (user time, system time, etc.) could also benefit, as this data is updated by the kernel but read frequently by user processes. The key requirement is that the data must be safe to expose to user space and not require complex kernel computation on each access.
+
+3. For every leaf page in the vmprint output, explain what it logically contains and what its permission bits are, and how it relates to the output of the earlier print_pgtbl() exercise:
+
+The vmprint output shows all the leaf pages that make up the process's memory layout. The first few pages (starting at address 0) contain the program's code and data with read, write, and execute permissions (0x5B), followed by data-only pages with read and write access (0x17). Higher memory addresses include special kernel pages like the trapframe for saving registers (0x13), the trampoline for switching between user and kernel mode (0xC7), and the USYSCALL page for fast system calls (0x4B). These leaf pages directly correspond to the individual entries shown in print_pgtbl - each virtual address in print_pgtbl's output matches one of these vmprint leaves, showing the same permissions and physical mappings but from a flat list view rather than a hierarchical tree structure.

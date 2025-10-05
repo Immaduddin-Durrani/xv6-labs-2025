@@ -20,6 +20,13 @@
 // qemu puts UART registers here in physical memory.
 #define UART0 0x10000000L
 #define UART0_IRQ 10
+#define PGSIZE 4096
+// Superpage (2MB) definitions
+#define SUPERPAGE_SIZE (2 * 1024 * 1024)  // 2MB
+#define SUPERPAGE_NPAGES 512  // Number of 4KB pages in a superpage (2MB)
+
+#define N_SUPERPAGES 8
+
 
 // virtio mmio interface
 #define VIRTIO0 0x10001000
@@ -65,7 +72,12 @@
 #ifdef LAB_PGTBL
 #define USYSCALL (TRAPFRAME - PGSIZE)
 
+#ifndef USYSCALL_STRUCT_DEFINED
+#define USYSCALL_STRUCT_DEFINED
 struct usyscall {
   int pid;  // Process ID
 };
-#endif
+#endif  // USYSCALL_STRUCT_DEFINED
+
+#endif  // LAB_PGTBL
+
