@@ -1,4 +1,3 @@
-
 # To compile and run with a lab solution, set the lab name in conf/lab.mk
 # (e.g., LAB=util).  Run make grade to test solution with the lab's
 # grade script (e.g., grade-lab-util).
@@ -88,7 +87,8 @@ LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+
 
 ifdef LAB
 LABUPPER = $(shell echo $(LAB) | tr a-z A-Z)
@@ -151,7 +151,7 @@ endif
 
 _%: %.o $(ULIB) $U/user.ld
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $< $(ULIB)
-	$(OBJDUMP) -S $@ > $*.asm
+w	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
 $U/usys.S : $U/usys.pl
@@ -167,7 +167,8 @@ $U/_forktest: $U/forktest.o $(ULIB)
 	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
 
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
-	gcc $(XCFLAGS) -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
+	gcc $(XCFLAGS) -Wno-unknown-attributes -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
+
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
@@ -198,6 +199,17 @@ UPROGS=\
 
 
 
+<<<<<<< HEAD
+=======
+ifeq ($(LAB),util)
+UPROGS += \
+	$U/_sleep\
+	$U/_sixfive\
+	$U/_find
+endif
+### ENDIF
+
+>>>>>>> upstream/pgtbl
 
 ifeq ($(LAB),syscall)
 UPROGS += \
@@ -277,7 +289,13 @@ ifeq ($(LAB),util)
 	UEXTRA += user/sixfive.txt
 	UPROGS += $U/_memdump
 endif
+<<<<<<< HEAD
 
+=======
+ifeq ($(LAB),syscall)
+	UEXTRA += user/exec.sh
+endif
+>>>>>>> upstream/pgtbl
 
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
