@@ -42,35 +42,32 @@ usertrap(void)
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
-  // send interrupts and exceptions to kerneltrap(),
-  // since we're now in the kernel.
-  w_stvec((uint64)kernelvec);  //DOC: kernelvec
+  w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
   
-  // save user program counter.
   p->trapframe->epc = r_sepc();
   
   if(r_scause() == 8){
     // system call
-
     if(killed(p))
       kexit(-1);
 
-    // sepc points to the ecall instruction,
-    // but we want to return to the next instruction.
     p->trapframe->epc += 4;
-
-    // an interrupt will change sepc, scause, and sstatus,
-    // so enable only now that we're done with those registers.
     intr_on();
-
     syscall();
   } else if((which_dev = devintr()) != 0){
-    // ok
+    // Handle device interrupts
+    
+      if(which_dev == 2) {
+        // DEBUG: print alarm info
+
+        yield();
+      }
+
   } else if((r_scause() == 15 || r_scause() == 13) &&
             vmfault(p->pagetable, r_stval(), (r_scause() == 13)? 1 : 0) != 0) {
-    // page fault on lazily-allocated page
+    // page fault
   } else {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
@@ -80,16 +77,9 @@ usertrap(void)
   if(killed(p))
     kexit(-1);
 
-  // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
-
   prepare_return();
 
-  // the user page table to switch to, for trampoline.S
   uint64 satp = MAKE_SATP(p->pagetable);
-
-  // return to trampoline.S; satp value in a0.
   return satp;
 }
 
@@ -162,7 +152,7 @@ kerneltrap()
 }
 
 void
-clockintr()
+clockintr(void)
 {
   if(cpuid() == 0){
     acquire(&tickslock);
@@ -171,11 +161,32 @@ clockintr()
     release(&tickslock);
   }
 
-  // ask for the next timer interrupt. this also clears
-  // the interrupt request. 1000000 is about a tenth
-  // of a second.
+  struct proc *p = myproc();
+  if(p && p->alarm_interval > 0 && p->alarm_enabled){
+      p->alarm_ticks--;
+      if(p->alarm_ticks <= 0){
+          if(p->alarm_trapframe == 0)
+              p->alarm_trapframe = kalloc();
+
+          if(p->alarm_trapframe){
+              memmove(p->alarm_trapframe, p->trapframe, sizeof(struct trapframe));
+              
+              // set trapframe to jump to handler
+              p->trapframe->epc = (uint64)p->alarm_handler;
+
+              // DISABLE further alarms while handler executes
+              p->alarm_enabled = 0;
+
+              // reset ticks for next alarm
+              p->alarm_ticks = p->alarm_interval;
+          }
+      }
+  }
+
+
   w_stimecmp(r_time() + 1000000);
 }
+
 
 // check if it's an external interrupt or software interrupt,
 // and handle it.
@@ -216,4 +227,3 @@ devintr()
     return 0;
   }
 }
-

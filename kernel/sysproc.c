@@ -81,6 +81,9 @@ sys_pause(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
+  
+  backtrace();
+  
   return 0;
 }
 
@@ -104,4 +107,87 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_sleep(void)
+{
+  int n;
+  uint ticks0;
+
+  argint(0, &n);
+  if(n < 0)
+    n = 0;
+  acquire(&tickslock);
+  ticks0 = ticks;
+  while(ticks - ticks0 < n){
+    if(killed(myproc())){
+      release(&tickslock);
+      return -1;
+    }
+    sleep(&ticks, &tickslock);
+  }
+  printf("Calling backtrace from sys_sleep\n");
+  backtrace();  // Add this line here
+  
+  release(&tickslock);
+  return 0;
+}
+
+uint64
+sys_sigalarm(void)
+{
+  int interval;
+  uint64 handler;
+
+  argint(0, &interval);
+  argaddr(1, &handler);
+
+  struct proc *p = myproc();
+
+  if(interval == 0) {
+    p->alarm_interval = 0;
+    p->alarm_handler = 0;
+    p->alarm_ticks = 0;
+    p->alarm_enabled = 0;  // Disable when interval is 0
+    if(p->alarm_trapframe) {
+      kfree(p->alarm_trapframe);
+      p->alarm_trapframe = 0;
+    }
+    return 0;
+  }
+
+  if(interval < 0)
+    return -1;
+
+  p->alarm_interval = interval;
+  p->alarm_handler = (void(*)())handler;
+  p->alarm_ticks = interval;
+  p->alarm_enabled = 1;  // Enable alarms
+
+  return 0;
+}
+
+
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  
+  if(p->alarm_trapframe == 0) {
+    return -1;
+  }
+  
+  // Restore the original trapframe
+  *(p->trapframe) = *(p->alarm_trapframe);
+  
+  // Free the saved trapframe
+  kfree(p->alarm_trapframe);
+  p->alarm_trapframe = 0;
+  
+  // CRITICAL: Re-enable alarms for the next interval
+  p->alarm_enabled = 1;
+  p->alarm_ticks = p->alarm_interval; // reset ticks
+  
+  return p->trapframe->a0;
 }

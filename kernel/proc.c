@@ -125,26 +125,35 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // Initialize alarm fields
+  p->alarm_interval = 0;
+  p->alarm_handler = 0;
+  p->alarm_ticks = 0;
+  p->alarm_enabled = 0;
+  p->alarm_trapframe = 0;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
-    freeproc(p);
-    release(&p->lock);
-    return 0;
+      freeproc(p);
+      release(&p->lock);
+      return 0;
   }
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
-    freeproc(p);
-    release(&p->lock);
-    return 0;
+      freeproc(p);
+      release(&p->lock);
+      return 0;
   }
+
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  
 
   return p;
 }
@@ -169,6 +178,15 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  
+  if(p->alarm_trapframe){
+      kfree(p->alarm_trapframe);
+      p->alarm_trapframe = 0;
+    }
+  p->alarm_interval = 0;
+  p->alarm_handler = 0;
+  p->alarm_ticks = 0;
+  p->alarm_enabled = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
