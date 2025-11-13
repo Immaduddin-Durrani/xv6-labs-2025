@@ -49,14 +49,12 @@ OBJS += \
 	$K/sprintf.o
 endif
 
-
 ifeq ($(LAB),net)
 OBJS += \
 	$K/e1000.o \
 	$K/net.o \
 	$K/pci.o
 endif
-
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
@@ -88,7 +86,6 @@ OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
 CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
-
 
 ifdef LAB
 LABUPPER = $(shell echo $(LAB) | tr a-z A-Z)
@@ -132,6 +129,7 @@ $K/kernel: $(OBJS) $(OBJS_KCSAN) $K/kernel.ld
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) $(OBJS_KCSAN)
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
+
 $(OBJS): EXTRAFLAG := $(KCSANFLAG)
 
 $K/%.o: $K/%.c
@@ -151,7 +149,7 @@ endif
 
 _%: %.o $(ULIB) $U/user.ld
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $< $(ULIB)
-w	$(OBJDUMP) -S $@ > $*.asm
+	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
 $U/usys.S : $U/usys.pl
@@ -168,7 +166,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc $(XCFLAGS) -Wno-unknown-attributes -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
-
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
@@ -195,21 +192,13 @@ UPROGS=\
 	$U/_zombie\
 	$U/_logstress\
 	$U/_forphan\
-	$U/_dorphan\
+	$U/_dorphan
 
-
-
-<<<<<<< HEAD
-=======
 ifeq ($(LAB),util)
 UPROGS += \
 	$U/_sleep\
-	$U/_sixfive\
 	$U/_find
 endif
-### ENDIF
-
->>>>>>> upstream/pgtbl
 
 ifeq ($(LAB),syscall)
 UPROGS += \
@@ -272,7 +261,6 @@ UPROGS += \
 	$U/_bigfile
 endif
 
-
 ifeq ($(LAB),mmap)
 UPROGS += \
 	$U/_mmaptest
@@ -286,16 +274,12 @@ endif
 UEXTRA=
 ifeq ($(LAB),util)
 	UEXTRA += user/findtest.sh
-	UEXTRA += user/sixfive.txt
 	UPROGS += $U/_memdump
 endif
-<<<<<<< HEAD
 
-=======
 ifeq ($(LAB),syscall)
 	UEXTRA += user/exec.sh
 endif
->>>>>>> upstream/pgtbl
 
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
@@ -306,12 +290,13 @@ newfs.img:
 -include kernel/*.d user/*.d
 
 clean:
-	rm -rf *.tex *.dvi *.idx *.aux *.log *.ind *.ilg *.dSYM *.zip *.pcap \
-	*/*.o */*.d */*.asm */*.sym \
-	$K/kernel fs.img \
-	mkfs/mkfs .gdbinit \
-        $U/usys.S \
-	$(UPROGS)
+	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg
+	rm -rf *.dSYM *.zip *.pcap
+	rm -f */*.o */*.d */*.asm */*.sym
+	rm -f $K/kernel fs.img
+	rm -f mkfs/mkfs .gdbinit
+	rm -f $U/usys.S
+	rm -f $(UPROGS)
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
@@ -357,7 +342,6 @@ qemu-gdb: $K/kernel .gdbinit fs.img
 ifeq ($(LAB),net)
 # try to generate a unique port for the echo server
 SERVERPORT = $(shell expr `id -u` % 5000 + 25099)
-
 endif
 
 ##
